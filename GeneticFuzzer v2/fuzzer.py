@@ -8,6 +8,12 @@ import shutil
 
 global main_coverage #union of all coverages
 main_coverage = set()
+global inputProbability #Array of probabilities of each input being selected to be run through tested program
+inputProbability=[1.0]
+
+def cleanFiles(path):
+    for file in glob(path):
+        os.unlink(file)
 
 def load_file(fname):
     with open(fname, "rb") as f:
@@ -115,20 +121,23 @@ def reevaluateCoverage(coverageSets):
         fitnessList.append(len(x)*uniqness)
     return fitnessList
 
-def chose_input(input_samples):
+def chose_input_probabilities(input_samples):
     if(len(input_samples) != len(coverage_sets)):
         print("Wrong size of coverage set or inputs set")
         print("Input sample: %i" %len(input_samples))
         print("Coverage sample: %i" %len(coverage_sets))
         return -1
-    print(coverage_sets)
-    inputProbability = reevaluateCoverage(coverage_sets)
+    #print(coverage_sets)
+
+    #set input probability
+    insideInputProbability = reevaluateCoverage(coverage_sets)
     fitSum = 0.0
-    for x in inputProbability:
+    for x in insideInputProbability:
         fitSum = fitSum + float(x)
-    print(fitSum)
-    inputProbability = [x/fitSum for x in inputProbability]
-    return inputProbability
+    #print(fitSum)
+    insideInputProbability = [x/fitSum for x in insideInputProbability]
+
+    return insideInputProbability
     '''
     #amount of blocks in coverage + uniqness + gdb crashSS
     print(coverage_sets)
@@ -170,6 +179,7 @@ def get_coverage(covname):
 
 def run_cov(exename,input_name,iteration):
     global errorcode
+    global inputProbability
     p = subprocess.Popen([exename,input_name],
                         env=os.environ,
                         stdout=subprocess.PIPE,
@@ -202,6 +212,8 @@ def run_cov(exename,input_name,iteration):
             shutil.copyfile("test.sample",fname)
             #input_samples.pop()
             input_samples.append(load_file(fname))
+            inputProbability = chose_input_probabilities(input_samples)
+            #print("New probabilities: ", inputProbability)
     return None
 
 def run_original(exename,input_name):
@@ -223,6 +235,10 @@ def run_original(exename,input_name):
             coverage_file.write(str(data)+"\n")
         coverage_file.close()
     return None
+
+
+cleanFiles("./cov/*.*")
+cleanFiles("./inputs/*.*")
 
 os.environ["ASAN_OPTIONS"]="coverage=1, coverage_dir=./cov"
 
@@ -249,15 +265,19 @@ if output != None:
 
 #infinite loop of fuzzer
 while True:
+    '''
     if i==1000:
-        probabilityList = chose_input(input_samples)
+        probabilityList = chose_input_probabilities(input_samples)
         print(probabilityList)
         print("Chosen file: ", selectIndexFromListOfProbabilities(probabilityList))
         break
+    '''
     i=i+1
     sys.stdout.write("%i"%errorcode)
     sys.stdout.flush()
-    mutated_sample = mutate(random.choice(input_samples))
+    #mutated_sample = mutate(random.choice(input_samples))
+    #print("selected input: ",selectIndexFromListOfProbabilities(inputProbability))
+    mutated_sample = mutate(input_samples[selectIndexFromListOfProbabilities(inputProbability)])
     save_file("test.sample", mutated_sample)
     output = run_cov("./a.out","test.sample",i)
     if output != None:
