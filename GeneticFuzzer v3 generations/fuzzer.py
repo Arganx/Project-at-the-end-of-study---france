@@ -198,9 +198,7 @@ def run_cov(exename,input_name,iteration,sessionId):
         os.unlink(cov)#The coverage file stops existing
         if not c.issubset(main_coverage):
             #Add new file to inputs.
-            #input_file = open("./inputs/input.%i.sample" %iteration,"w")
             shutil.copyfile("test.sample","./inputs/input.{}.session:{},unique:{}.sample".format(iteration,sessionId,uuid.uuid4()))
-            #input_file.close()
 
             children.append(load_file(input_name))
             #Add new coverage to coverages
@@ -242,11 +240,8 @@ def run_original(exename,input_name,session_id):
             mini=i
         if maxi < i:
             maxi=i
-    #print("MAX: ", maxi)
-    #print("MINI: ", mini)
     parents_cov.append(mini)
     main_coverage.update(mini)
-    #TODO add saving the file of coverage
     coverage_file  = open("./cov/coverage.input.session:{}.txt".format(session_id),"w")
     for data in mini:
         coverage_file.write(str(data)+"\n")
@@ -262,7 +257,11 @@ os.environ["ASAN_OPTIONS"]="coverage=1, coverage_dir=./cov"
 for cov in glob("./cov/*.sancov"):
     os.unlink(cov)
 
-parents = [load_file("input.txt")] #old generation inputs
+parents =[]
+inputFiles = ["input.txt","input2.txt"]
+for x in inputFiles:
+    parents.append(load_file(x))
+#parents = [load_file("input.txt"),load_file("input2.txt")] #old generation inputs
 parents_cov = [] #old generation coverages
 children = [] #new generation inputs
 children_cov =[] #new generation coverage
@@ -270,13 +269,17 @@ children_cov =[] #new generation coverage
 errorcode=0
 i=1 #to prevent new generation on entry into fullFuzzing mode
 #execution of a original input to generate coverage file for it
-output = run_original("./a.out","test.sample",sessionId)
-if output != None:
-    print("CRASH")
-    save_file("crash.sample.%i" % i, mutated_sample)
-    save_file("crash.sample.%i.txt" % i, output)
+for x in inputFiles:
+    print("Run with: ",x)
+    output = run_original("./a.out",x,sessionId)
+    if output != None:
+        print("CRASH")
+        save_file("crash.sample.%i" % i, mutated_sample)
+        save_file("crash.sample.%i.txt" % i, output)
+print("Coveraages: " , parents_cov)
 print(main_coverage)
-
+inputProbability = chose_input_probabilities(parents)
+print("Probabilities:",inputProbability)
 #first x iterations of the fuzzer to check if there is a possible error with address sanitizer
 #get out of function on new coverage or a crush
 for iteration in range(safetybarrier):
