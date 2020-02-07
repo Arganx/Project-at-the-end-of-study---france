@@ -1,6 +1,7 @@
 import struct
 import subprocess
 import random
+import os
 
 def load_file(fname):
     with open(fname, "rb") as f:
@@ -66,40 +67,44 @@ def mutate_magic(data):
 
 def mutate(data):
     return random.choice([
-        mutate_bits,
+        #mutate_bits,
         mutate_bytes,
-        mutate_magic
+        #mutate_magic
     ])(data[::])
 
 input_samples = [
     load_file("input.sample")
 ]
 
-def run(exename):
+def run(exename,inputname):
     #subprocess.check_call([exename,"test.sample"],timeout=2)
-    p = subprocess.Popen(["gdb","--batch","-x","detect.gdb",exename],
+    p = subprocess.Popen([exename,inputname],#["gdb","--batch","-x","detect.gdb",exename],
                          stdout=subprocess.PIPE,
-                         stderr = None)
-    output, _ = p.communicate()
-    #print("Output", output)
+                         stderr = subprocess.PIPE)
+    output, error = p.communicate()
+    print("Output", output)
+    print("Error: ", error)
 
-    if "Program received signal" in str(output):
-        result = str(output)
-        return result.split("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")[1]
+    if "ERROR" or "WARNING" in str(error):
+        result = str(error)
+	#print("ERRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRROR")
+        return result#.split("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk")[1]
     return None
 i=0
+os.environ["ASAN_OPTIONS"]="coverage=1, coverage_dir=./cov"
+os.environ["LSAN_OPTIONS"]="verbosity=1:log_threads=1"
 while True:
     print(i)
     i=i+1
     mutated_sample = mutate(random.choice(input_samples))
     save_file("test.sample", mutated_sample)
     #try:
-    output = run("VulnerableProgram.exe")
+    output = run("./a.out","test.sample")
     if output != None:
         print("CRASH")
         save_file("crash.sample.%i" % i, mutated_sample)
         save_file("crash.sample.%i.txt" % i, output)
-        break
+        #break
     #except subprocess.TimeoutExpired:
     #    print("Expired")
     #    continue
